@@ -13,8 +13,8 @@ services:
     env: node
     region: ohio  # ou sao-paulo (South America)
     plan: free
-    buildCommand: npm run db:generate && npm run build
-    startCommand: sh -c 'npx tsx scripts/init-turso.ts && npm run start'
+    buildCommand: npm install && ./node_modules/.bin/prisma generate && npm run build
+    startCommand: sh -c './node_modules/.bin/tsx scripts/init-turso.ts && npm run start'
     healthCheckPath: /
 
     envVars:
