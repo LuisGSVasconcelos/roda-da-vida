@@ -31,7 +31,22 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env.production
+.env.development
+
+# agent config dirs
+.agents/
+.claude/
+.windsurf/
+
+# local SQLite database (regenerated from seed)
+/prisma/dev.db
+/dev.db
+
+# hermes
+skills-lock.json
 
 # vercel
 .vercel
@@ -39,3 +54,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma generated client (regenerated during build)
+/src/generated/
