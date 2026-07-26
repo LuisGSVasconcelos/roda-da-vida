@@ -1,71 +1,77 @@
-# 🚀 Deploy no Render (gratuito)
+# 🚀 Deploy no Render (gratuito) com Turso
 
-**Stack:** Next.js 16 + SQLite (persistente) + Prisma 7
+**Stack:** Next.js 16 + Turso (SQLite remoto) + Prisma 7
 
 ---
 
-## 1. Pré-requisitos
+## 1. Criar database no Turso
 
-- Conta gratuita em [render.com](https://render.com) (login com GitHub)
-- Repositório no GitHub com o código do app
+1. Acesse **https://turso.tech** e faça login com GitHub
+2. **Create Database:**
+   - Nome: `roda-da-vida`
+   - Location: `gru-1` (São Paulo)
+   - Create
+3. Na página da database, clique em **"Generate Token"** → copie o token
 
-## 2. Push do código
+## 2. Configurar env vars no Render
+
+No **Render Dashboard → seu serviço → Environment**, adicione:
+
+| Key | Value |
+|-----|-------|
+| `DATABASE_URL` | `libsql://roda-da-vida-SEU_USUARIO.turso.io?authToken=SEU_TOKEN` |
+| `AUTH_SECRET` | (Render gera automático) |
+
+Substitua `SEU_USUARIO` pelo seu org do Turso e `SEU_TOKEN` pelo token gerado.
+
+## 3. Push do código
 
 ```bash
-git init
+cd /c/Users/lugos/roda-da-vida
 git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/seu-usuario/roda-da-vida.git
-git push -u origin main
+git commit -m "Turso: SQLite na nuvem"
+git push
 ```
 
-## 3. Deploy via Blueprint (automático)
+## 4. Deploy via Blueprint
 
-1. Faça login no [Render Dashboard](https://dashboard.render.com)
-2. Clique em **New → Blueprint**
-3. Conecte seu repositório GitHub
-4. Render detecta o `render.yaml` e configura automaticamente:
-   - Web service `roda-da-vida`
-   - Persistent Disk de 1GB montado em `/data`
-   - Variáveis de ambiente (`DATABASE_URL`, `AUTH_SECRET`)
-5. Clique em **Apply**
-
-## 4. Primeiro deploy
-
-O Render vai:
-1. **Build:** `npx prisma generate && npm run build`
-2. **Start:** `npx prisma db push && npx prisma db seed && npm run start`
-
-O primeiro deploy leva ~2-3 minutos.
+1. **Render Dashboard → New → Blueprint**
+2. Conecte o repositório `LuisGSVasconcelos/roda-da-vida`
+3. Render detecta o `render.yaml`
+4. Antes de Apply, clique em **"Environment"** e cole a `DATABASE_URL` do Turso
+5. Clique **Apply**
 
 ## 5. Acessar
 
-Após o deploy, seu app estará em:
 ```
 https://roda-da-vida.onrender.com
 ```
 
 ## 6. Próximos deploys
 
-A cada `git push`, o Render automaticamente:
-1. Faz o build da nova versão
-2. Substitui o código em execução
-3. **Seus dados no banco permanecem intactos** (no Persistent Disk)
-
-## 7. Conta de teste
-
-Após o deploy, crie uma conta no próprio app ou registre manualmente via API:
 ```bash
-curl -X POST https://roda-da-vida.onrender.com/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Admin","email":"admin@email.com","password":"123456","role":"INDIVIDUAL"}'
+git add .
+git commit -m "descrição das mudanças"
+git push
+# Render atualiza automaticamente em ~2 min
 ```
 
-## 8. Dicas
+## 7. Desenvolvimento local
+
+```bash
+# Setup inicial (uma vez)
+npm run db:setup
+
+# Rodar servidor
+npm run dev
+# → http://localhost:3004
+```
+
+## Dicas
 
 | Problema | Solução |
 |----------|---------|
 | App lento no primeiro acesso | Free tier "dorme" após 15 min. Aguarde ~30s (cold start) |
-| Banco corrompido | Pare o serviço → Render Dashboard → **Shell** → `rm -f /data/dev.db` → reinicie |
 | Logs | Render Dashboard → seu serviço → **Logs** |
-| Variáveis de ambiente | Render Dashboard → seu serviço → **Environment** |
+| Token expirou | Gere novo token no Turso e atualize a env var no Render |
+| Rodar seed manual | `npm run db:seed` (ou no Render: Shell → `npx prisma db seed`) |

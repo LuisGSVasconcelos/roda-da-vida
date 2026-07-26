@@ -48,6 +48,10 @@ yarn-error.log*
 # hermes
 skills-lock.json
 
+# turso CLI artifacts
+help
+help-wal
+
 # vercel
 .vercel
 

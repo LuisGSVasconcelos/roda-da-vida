@@ -1,36 +1,26 @@
 # ─── Render Blueprint ──────────────────────────────────────────────────────
-# Deploy da plataforma Roda da Vida com SQLite persistente
+# Deploy da plataforma Roda da Vida com Turso (SQLite na nuvem)
 # Documentação: https://render.com/docs/blueprint-spec
 #
 # Como usar:
-#   1. Faça push deste repositório para o GitHub
-#   2. No Render Dashboard → New → Blueprint (ou conectar o repo)
-#   3. Render detecta este render.yaml e configura automaticamente
-#   4. Vá em Dashboard → seu serviço → Disks → anota o mount path
-#   5. Acesse o serviço, primeiro deploy já cria o banco
+#   1. Crie uma database no Turso: https://turso.tech
+#   2. Defina as env vars no Render Dashboard (ou aqui no render.yaml)
+#   3. Faça push — o Render faz o deploy automaticamente
 
 services:
   - type: web
     name: roda-da-vida
     env: node
-    region: ohio  # ou sao-paulo (South America) se disponível
+    region: ohio  # ou sao-paulo (South America)
     plan: free
     buildCommand: npx prisma generate && npm run build
-    startCommand: sh -c 'npx prisma db push && npx prisma db seed && npm run start'
+    startCommand: sh -c 'npx tsx scripts/init-turso.ts && npm run start'
     healthCheckPath: /
 
-    # ─── Banco SQLite persistente ──────────────────────────────────────
-    # Disk montado como /data — o banco fica seguro entre deploys
-    disk:
-      name: data
-      mountPath: /data
-      sizeGB: 1
-
-    # ─── Variáveis de ambiente ─────────────────────────────────────────
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: file:/data/dev.db
+        sync: false  # definir no dashboard do Render
       - key: AUTH_SECRET
         generateValue: true

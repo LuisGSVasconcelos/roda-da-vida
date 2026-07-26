@@ -11,6 +11,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
+    "db:init-turso": "tsx scripts/init-turso.ts",
     "setup": "npm run db:setup && echo '✅ Setup complete! Run: npm run dev'"
   },
   "dependencies": {
