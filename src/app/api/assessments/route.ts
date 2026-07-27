@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Scores são obrigatórios' }, { status: 400 })
     }
 
-    const prisma = getDb()
+    const prisma = await getDb()
 
     const assessment = await prisma.assessment.create({
       data: {
@@ -55,7 +55,7 @@ export async function GET() {
   }
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const assessments = await prisma.assessment.findMany({
       where: { userId: session.user.id },
       include: {

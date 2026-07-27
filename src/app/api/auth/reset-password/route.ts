@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Senha deve ter ao menos 6 caracteres' }, { status: 400 })
     }
 
-    const prisma = getDb()
+    const prisma = await getDb()
 
     // Busca o token
     const resetToken = await prisma.verificationToken.findUnique({

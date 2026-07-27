@@ -18,7 +18,7 @@ export async function PATCH(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const habit = await prisma.habit.findUnique({
       where: { id },
       include: { goal: { select: { userId: true } } },
@@ -104,7 +104,7 @@ export async function DELETE(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const habit = await prisma.habit.findUnique({
       where: { id },
       include: { goal: { select: { userId: true } } },

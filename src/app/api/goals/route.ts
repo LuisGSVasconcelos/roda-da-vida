@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const goals = await prisma.goal.findMany({
       where: { userId: session.user.id },
       include: {
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Área e "O que fazer" são obrigatórios' }, { status: 400 })
     }
 
-    const prisma = getDb()
+    const prisma = await getDb()
     const goal = await prisma.goal.create({
       data: {
         userId: session.user.id,

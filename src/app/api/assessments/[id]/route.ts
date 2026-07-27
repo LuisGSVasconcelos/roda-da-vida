@@ -17,7 +17,7 @@ export async function GET(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const assessment = await prisma.assessment.findUnique({
       where: { id },
       include: {
