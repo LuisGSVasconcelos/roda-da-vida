@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Email é obrigatório' }, { status: 400 })
     }
 
-    const prisma = await getDb()
+    const prisma = getDb()
 
     // Verifica se o usuário existe
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })

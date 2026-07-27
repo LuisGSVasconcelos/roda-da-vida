@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Tipo de conta inválido.' }, { status: 400 })
     }
 
-    const prisma = await getDb()
+    const prisma = getDb()
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {

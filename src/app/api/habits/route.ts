@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Meta e ação são obrigatórias' }, { status: 400 })
     }
 
-    const prisma = await getDb()
+    const prisma = getDb()
 
     // Verificar se a meta pertence ao usuário
     const goal = await prisma.goal.findUnique({ where: { id: goalId } })
@@ -51,7 +51,7 @@ export async function GET() {
   }
 
   try {
-    const prisma = await getDb()
+    const prisma = getDb()
     const habits = await prisma.habit.findMany({
       where: { goal: { userId: session.user.id } },
       include: {

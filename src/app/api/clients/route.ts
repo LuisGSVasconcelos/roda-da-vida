@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const prisma = await getDb()
+    const prisma = getDb()
     const clients = await prisma.client.findMany({
       where: { professionalId: session.user.id },
       include: {
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Nome obrigatório' }, { status: 400 })
     }
 
-    const prisma = await getDb()
+    const prisma = getDb()
     const client = await prisma.client.create({
       data: {
         professionalId: session.user.id,

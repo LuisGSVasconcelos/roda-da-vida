@@ -29,7 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string
         const password = credentials.password as string
 
-        const prisma = await getDb()
+        const prisma = getDb()
         const user = await prisma.user.findUnique({
           where: { email },
         })
