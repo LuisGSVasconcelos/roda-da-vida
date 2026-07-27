@@ -1,8 +1,10 @@
 /**
  * Inicialização do banco Turso — schema + seed
- * Usa o Prisma Client adapter (que entende libsql://)
+ * Usa @libsql/client diretamente (DDL não funciona via $executeRawUnsafe)
  * Roda uma vez na primeira inicialização do Render
  */
+
+import { createClient } from '@libsql/client'
 import { PrismaClient } from '../src/generated/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 
@@ -21,6 +23,113 @@ const DEFAULT_CATEGORIES = [
   { id: 'espiritualidade', name: 'Espiritualidade',                color: '#A78BFA', order: 11 },
 ]
 
+const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS "User" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "email" TEXT NOT NULL UNIQUE,
+  "passwordHash" TEXT NOT NULL,
+  "role" TEXT NOT NULL DEFAULT 'INDIVIDUAL',
+  "image" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "Category" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "description" TEXT,
+  "color" TEXT NOT NULL DEFAULT '#6366f1',
+  "icon" TEXT NOT NULL DEFAULT 'circle',
+  "order" INTEGER NOT NULL DEFAULT 0,
+  "isDefault" INTEGER NOT NULL DEFAULT 0,
+  "userId" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL,
+  FOREIGN KEY ("userId") REFERENCES "User"("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Assessment" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "clientId" TEXT,
+  "title" TEXT NOT NULL DEFAULT 'Avaliação',
+  "notes" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL,
+  FOREIGN KEY ("userId") REFERENCES "User"("id"),
+  FOREIGN KEY ("clientId") REFERENCES "Client"("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Score" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "assessmentId" TEXT NOT NULL,
+  "categoryId" TEXT NOT NULL,
+  "value" INTEGER NOT NULL DEFAULT 5,
+  "reflectionNotes" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("assessmentId") REFERENCES "Assessment"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("categoryId") REFERENCES "Category"("id"),
+  UNIQUE ("assessmentId", "categoryId")
+);
+
+CREATE TABLE IF NOT EXISTS "Goal" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "assessmentId" TEXT,
+  "userId" TEXT NOT NULL,
+  "clientId" TEXT,
+  "area" TEXT NOT NULL,
+  "what" TEXT NOT NULL,
+  "why" TEXT,
+  "where" TEXT,
+  "when" TEXT,
+  "who" TEXT,
+  "how" TEXT,
+  "cost" TEXT,
+  "priority" INTEGER NOT NULL DEFAULT 1,
+  "completed" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL,
+  FOREIGN KEY ("userId") REFERENCES "User"("id"),
+  FOREIGN KEY ("clientId") REFERENCES "Client"("id"),
+  FOREIGN KEY ("assessmentId") REFERENCES "Assessment"("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Habit" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "goalId" TEXT NOT NULL,
+  "action" TEXT NOT NULL,
+  "time" TEXT,
+  "place" TEXT,
+  "streak" INTEGER NOT NULL DEFAULT 0,
+  "bestStreak" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("goalId") REFERENCES "Goal"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "HabitLog" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "habitId" TEXT NOT NULL,
+  "date" DATETIME NOT NULL,
+  "completed" INTEGER NOT NULL DEFAULT 1,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("habitId") REFERENCES "Habit"("id") ON DELETE CASCADE,
+  UNIQUE ("habitId", "date")
+);
+
+CREATE TABLE IF NOT EXISTS "Client" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "professionalId" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "email" TEXT,
+  "phone" TEXT,
+  "notes" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL,
+  FOREIGN KEY ("professionalId") REFERENCES "User"("id")
+);
+`
+
 async function main() {
   const url = process.env.DATABASE_URL
   if (!url || url.startsWith('file:')) {
@@ -30,143 +139,46 @@ async function main() {
 
   console.log('🚀 Inicializando banco Turso...')
 
+  // ─── 1. Schema: usar libsql client direto (DDL) ──────────────────
+  const sqlClient = createClient({ url })
+  try {
+    console.log('📦 Criando tabelas...')
+
+    // Executa cada statement separadamente
+    const statements = SCHEMA_SQL.split(';').map(s => s.trim()).filter(s => s.length > 0)
+    for (const stmt of statements) {
+      await sqlClient.execute(stmt + ';')
+    }
+
+    console.log('✅ Tabelas criadas')
+  } catch (error) {
+    console.error('❌ Erro ao criar tabelas:', error)
+    process.exit(1)
+  } finally {
+    sqlClient.close()
+  }
+
+  // ─── 2. Seed: usar Prisma Client (CRUD normal) ───────────────────
   const adapter = new PrismaLibSql({ url })
   const prisma = new PrismaClient({ adapter })
 
   try {
-    // Push schema via raw SQL (compatível com SQLite/Turso)
-    console.log('📦 Criando tabelas...')
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "User" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "email" TEXT NOT NULL UNIQUE,
-        "passwordHash" TEXT NOT NULL,
-        "role" TEXT NOT NULL DEFAULT 'INDIVIDUAL',
-        "image" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Category" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "description" TEXT,
-        "color" TEXT NOT NULL DEFAULT '#6366f1',
-        "icon" TEXT NOT NULL DEFAULT 'circle',
-        "order" INTEGER NOT NULL DEFAULT 0,
-        "isDefault" INTEGER NOT NULL DEFAULT 0,
-        "userId" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("userId") REFERENCES "User"("id")
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Assessment" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "userId" TEXT NOT NULL,
-        "clientId" TEXT,
-        "title" TEXT NOT NULL DEFAULT 'Avaliação',
-        "notes" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("userId") REFERENCES "User"("id"),
-        FOREIGN KEY ("clientId") REFERENCES "Client"("id")
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Score" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "assessmentId" TEXT NOT NULL,
-        "categoryId" TEXT NOT NULL,
-        "value" INTEGER NOT NULL DEFAULT 5,
-        "reflectionNotes" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY ("assessmentId") REFERENCES "Assessment"("id") ON DELETE CASCADE,
-        FOREIGN KEY ("categoryId") REFERENCES "Category"("id"),
-        UNIQUE ("assessmentId", "categoryId")
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Goal" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "assessmentId" TEXT,
-        "userId" TEXT NOT NULL,
-        "clientId" TEXT,
-        "area" TEXT NOT NULL,
-        "what" TEXT NOT NULL,
-        "why" TEXT,
-        "where" TEXT,
-        "when" TEXT,
-        "who" TEXT,
-        "how" TEXT,
-        "cost" TEXT,
-        "priority" INTEGER NOT NULL DEFAULT 1,
-        "completed" INTEGER NOT NULL DEFAULT 0,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("userId") REFERENCES "User"("id"),
-        FOREIGN KEY ("clientId") REFERENCES "Client"("id"),
-        FOREIGN KEY ("assessmentId") REFERENCES "Assessment"("id")
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Habit" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "goalId" TEXT NOT NULL,
-        "action" TEXT NOT NULL,
-        "time" TEXT,
-        "place" TEXT,
-        "streak" INTEGER NOT NULL DEFAULT 0,
-        "bestStreak" INTEGER NOT NULL DEFAULT 0,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY ("goalId") REFERENCES "Goal"("id") ON DELETE CASCADE
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "HabitLog" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "habitId" TEXT NOT NULL,
-        "date" DATETIME NOT NULL,
-        "completed" INTEGER NOT NULL DEFAULT 1,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY ("habitId") REFERENCES "Habit"("id") ON DELETE CASCADE,
-        UNIQUE ("habitId", "date")
-      )
-    `)
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "Client" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "professionalId" TEXT NOT NULL,
-        "name" TEXT NOT NULL,
-        "email" TEXT,
-        "phone" TEXT,
-        "notes" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL,
-        FOREIGN KEY ("professionalId") REFERENCES "User"("id")
-      )
-    `)
-
-    console.log('✅ Tabelas criadas')
-
-    // Seed categorias
     console.log('🌱 Seedando categorias...')
     for (const cat of DEFAULT_CATEGORIES) {
       const existing = await prisma.category.findUnique({ where: { id: cat.id } })
       if (!existing) {
         await prisma.category.create({ data: { ...cat, isDefault: true } })
         console.log(`  ✅ ${cat.name}`)
+      } else {
+        console.log(`  ⏭️  Existe: ${cat.name}`)
       }
     }
     console.log('✅ Seed completo!')
-
-    await prisma.$disconnect()
   } catch (error) {
-    console.error('❌ Erro na inicialização:', error)
+    console.error('❌ Erro no seed:', error)
     process.exit(1)
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
