@@ -1,5 +1,5 @@
 // Prisma client singleton com driver adapter para Prisma 7
-// Suporte nativo a Turso (authToken separado da URL)
+// Suporte a Turso: DATABASE_URL + TURSO_AUTH_TOKEN como env vars separadas
 
 import { PrismaClient } from '../generated/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
@@ -7,21 +7,23 @@ import { PrismaLibSql } from '@prisma/adapter-libsql'
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
 function createPrismaClient(): PrismaClient {
-  const rawUrl = process.env.DATABASE_URL ?? 'file:./dev.db'
+  const url = process.env.DATABASE_URL ?? 'file:./dev.db'
 
-  // Se for Turso (libsql://), extrai authToken da query string
-  if (rawUrl.startsWith('libsql://')) {
-    const u = new URL(rawUrl)
-    const authToken = u.searchParams.get('authToken') ?? undefined
-    // Remove authToken da URL (passamos separado)
-    u.searchParams.delete('authToken')
-    const cleanUrl = u.toString().replace(/[?]$/, '')
-    const adapter = new PrismaLibSql({ url: cleanUrl, authToken })
+  if (url.startsWith('libsql://')) {
+    const authToken = process.env.TURSO_AUTH_TOKEN
+    // Tenta extrair da query string como fallback
+    const qsToken = !authToken && url.includes('?authToken=')
+      ? url.slice(url.indexOf('?authToken=') + '?authToken='.length).split('&')[0]
+      : undefined
+
+    const adapter = new PrismaLibSql({
+      url: qsToken ? url.split('?')[0] : url,
+      authToken: authToken || qsToken,
+    })
     return new PrismaClient({ adapter })
   }
 
-  // SQLite local
-  const adapter = new PrismaLibSql({ url: rawUrl })
+  const adapter = new PrismaLibSql({ url })
   return new PrismaClient({ adapter })
 }
 
