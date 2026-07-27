@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const categories = await prisma.category.findMany({
       where: {
         OR: [
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Nome deve ter ao menos 2 caracteres' }, { status: 400 })
     }
 
-    const prisma = getDb()
+    const prisma = await getDb()
 
     // Verificar se já existe categoria com mesmo nome para este usuário
     const existing = await prisma.category.findFirst({

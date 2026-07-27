@@ -18,7 +18,7 @@ export async function PATCH(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
 
     // Buscar a categoria
     const category = await prisma.category.findUnique({ where: { id } })
@@ -69,7 +69,7 @@ export async function DELETE(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
 
     const category = await prisma.category.findUnique({ where: { id } })
     if (!category) {

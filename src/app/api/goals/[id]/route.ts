@@ -18,7 +18,7 @@ export async function GET(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const goal = await prisma.goal.findUnique({
       where: { id },
       include: {
@@ -53,7 +53,7 @@ export async function PATCH(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const goal = await prisma.goal.findUnique({ where: { id } })
 
     const updates = await req.json()
@@ -82,7 +82,7 @@ export async function DELETE(
   const { id } = await params
 
   try {
-    const prisma = getDb()
+    const prisma = await getDb()
     const goal = await prisma.goal.findUnique({ where: { id } })
 
     await prisma.goal.delete({ where: { id } })
