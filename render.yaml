@@ -14,7 +14,7 @@ services:
     region: ohio  # ou sao-paulo (South America)
     plan: free
     buildCommand: npm install --include=dev && ./node_modules/.bin/prisma generate && npm run build
-    startCommand: sh -c './node_modules/.bin/tsx scripts/init-turso.ts && npm run start'
+    startCommand: npm run start
     healthCheckPath: /
 
     envVars:
