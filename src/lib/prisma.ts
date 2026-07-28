@@ -6,6 +6,12 @@ import { PrismaLibSql } from '@prisma/adapter-libsql'
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient; initPromise: Promise<void> | null }
 
+// Debug: mostrar status da env var imediatamente
+const _dbgUrl = process.env.DATABASE_URL || '(não definido)'
+const _dbgToken = process.env.TURSO_AUTH_TOKEN ? 'definido' : 'não definido'
+console.log('[prisma:init] DATABASE_URL:', _dbgUrl.slice(0, 100))
+console.log('[prisma:init] TURSO_AUTH_TOKEN:', _dbgToken)
+
 const TABLES_SQL = [
   `CREATE TABLE IF NOT EXISTS "User" ("id" TEXT NOT NULL PRIMARY KEY,"name" TEXT NOT NULL,"email" TEXT NOT NULL UNIQUE,"passwordHash" TEXT NOT NULL,"role" TEXT NOT NULL DEFAULT 'INDIVIDUAL',"image" TEXT,"createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" DATETIME NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS "Category" ("id" TEXT NOT NULL PRIMARY KEY,"name" TEXT NOT NULL,"description" TEXT,"color" TEXT NOT NULL DEFAULT '#6366f1',"icon" TEXT NOT NULL DEFAULT 'circle',"order" INTEGER NOT NULL DEFAULT 0,"isDefault" INTEGER NOT NULL DEFAULT 0,"userId" TEXT,"createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" DATETIME NOT NULL,FOREIGN KEY ("userId") REFERENCES "User"("id"))`,
