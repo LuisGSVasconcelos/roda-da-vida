@@ -1,9 +1,5 @@
 import { getDb } from '@/lib/prisma'
-// API de exportação PDF — gera PDF com resultado da avaliação
-
 import { auth } from '@/lib/auth'
-
-
 
 const { jsPDF } = require('jspdf')
 
@@ -37,7 +33,6 @@ export async function GET(req: Request) {
       },
     })
 
-
     if (!assessment) {
       return Response.json({ error: 'Avaliação não encontrada' }, { status: 404 })
     }
@@ -47,109 +42,139 @@ export async function GET(req: Request) {
     }
 
     const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
 
-    // Cabeçalho
-    doc.setFontSize(22)
+    // ─── Cabeçalho ───────────────────────────────────────────────────
+    doc.setFontSize(24)
     doc.setTextColor(124, 58, 237)
-    doc.text('✦ Roda da Vida', 105, 25, { align: 'center' })
+    doc.text('Roda da Vida', pageWidth / 2, 25, { align: 'center' })
+
+    // Linha decorativa
+    doc.setDrawColor(124, 58, 237)
+    doc.setLineWidth(0.5)
+    doc.line(margin, 30, pageWidth - margin, 30)
 
     doc.setFontSize(11)
     doc.setTextColor(45, 27, 61)
-    doc.text(`Avaliação: ${assessment.title}`, 20, 42)
-    doc.text(`Data: ${new Date(assessment.createdAt).toLocaleDateString('pt-BR')}`, 20, 50)
-    doc.text(`Nome: ${assessment.user.name || '—'}`, 20, 58)
+    doc.text(`Avaliacao: ${assessment.title}`, margin, 42)
+    doc.text(`Data: ${new Date(assessment.createdAt).toLocaleDateString('pt-BR')}`, margin, 50)
+    doc.text(`Nome: ${assessment.user.name || '-'}`, margin, 58)
 
-    // Média geral
+    // ─── Media geral ───────────────────────────────────────────────
     const scores = assessment.scores
     const avg = scores.length > 0
       ? (scores.reduce((sum: number, s: any) => sum + s.value, 0) / scores.length).toFixed(1)
-      : '—'
+      : '-'
 
-    doc.setFontSize(16)
+    doc.setFontSize(18)
     doc.setTextColor(124, 58, 237)
-    doc.text(`Média Geral: ${avg}/10`, 105, 72, { align: 'center' })
+    doc.text(`Media Geral: ${avg}/10`, pageWidth / 2, 75, { align: 'center' })
 
-    // Tabela de resultados
+    // ─── Tabela de resultados ──────────────────────────────────────
     doc.setFontSize(13)
     doc.setTextColor(45, 27, 61)
-    doc.text('Resultados por Área', 20, 88)
+    doc.text('Resultados por Area', margin, 92)
 
-    let y = 98
-    doc.setFontSize(10)
+    let y = 102
 
-    // Cabeçalho da tabela
+    // Cabecalho da tabela
     doc.setFillColor(247, 243, 255)
-    doc.rect(20, y - 5, 170, 7, 'F')
+    doc.rect(margin, y - 5, contentWidth, 7, 'F')
+    doc.setFontSize(9)
     doc.setTextColor(74, 44, 122)
-    doc.text('Área', 25, y)
-    doc.text('Nota', 160, y)
-    doc.text('Status', 175, y)
+    doc.text('Area', margin + 2, y)
+    doc.text('Nota', margin + 130, y)
+    doc.text('Status', margin + 150, y)
     y += 10
 
+    // Linhas
+    doc.setFontSize(9)
     scores.forEach((s: any) => {
-      const status = s.value >= 7 ? '✅' : s.value >= 4 ? '⚠️' : '❌'
-      doc.setTextColor(45, 27, 61)
-      doc.text(s.category.name, 25, y)
-      doc.text(`${s.value}/10`, 160, y)
-      doc.text(status, 175, y)
-      y += 7
+      const statusText = s.value >= 7 ? 'Bom' : s.value >= 4 ? 'Atencao' : 'Critico'
+      const statusColor = s.value >= 7 ? [16, 185, 129] : s.value >= 4 ? [245, 158, 11] : [239, 68, 68]
 
+      doc.setTextColor(45, 27, 61)
+      doc.text(s.category.name, margin + 2, y)
+
+      doc.setTextColor(74, 44, 122)
+      doc.text(`${s.value}/10`, margin + 130, y)
+
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2])
+      doc.text(statusText, margin + 150, y)
+
+      y += 6
+
+      // Anotacoes
       if (s.reflectionNotes) {
-        doc.setFontSize(8)
         doc.setTextColor(107, 91, 123)
-        doc.text(`   📝 ${s.reflectionNotes}`, 25, y)
-        y += 5
-        doc.setFontSize(10)
+        doc.setFontSize(8)
+        doc.text(`Obs: ${s.reflectionNotes}`, margin + 5, y)
+        y += 4
+        doc.setFontSize(9)
       }
 
-      if (y > 270) {
+      if (y > 265) {
         doc.addPage()
         y = 20
       }
     })
 
-    // Metas
+    // ─── Metas ─────────────────────────────────────────────────────
     if (assessment.goals.length > 0) {
-      y += 10
+      y += 8
       if (y > 250) { doc.addPage(); y = 20 }
 
       doc.setFontSize(13)
       doc.setTextColor(45, 27, 61)
-      doc.text('Plano de Ação (5W2H)', 20, y)
+      doc.text('Plano de Acao (5W2H)', margin, y)
       y += 10
 
-      assessment.goals.forEach((goal: any) => {
+      assessment.goals.forEach((goal: any, gi: number) => {
         doc.setFontSize(10)
         doc.setTextColor(45, 27, 61)
-        doc.text(`🎯 ${goal.what}`, 25, y); y += 6
+        doc.text(`${gi + 1}. ${goal.what}${goal.completed ? ' (Concluida)' : ''}`, margin + 2, y)
+        y += 6
+
         doc.setFontSize(8)
         doc.setTextColor(107, 91, 123)
-        if (goal.why) { doc.text(`   💡 Por quê: ${goal.why}`, 25, y); y += 5 }
-        if (goal.when) { doc.text(`   📅 Quando: ${goal.when}`, 25, y); y += 5 }
-        if (goal.how) { doc.text(`   🔧 Como: ${goal.how}`, 25, y); y += 5 }
-        if (goal.cost) { doc.text(`   💰 Custo: ${goal.cost}`, 25, y); y += 5 }
-        y += 3
+        const items: string[] = []
+        if (goal.why) items.push(`Por que: ${goal.why}`)
+        if (goal.when) items.push(`Quando: ${goal.when}`)
+        if (goal.how) items.push(`Como: ${goal.how}`)
+        if (goal.where) items.push(`Onde: ${goal.where}`)
+        if (goal.who) items.push(`Quem: ${goal.who}`)
+        if (goal.cost) items.push(`Custo: ${goal.cost}`)
 
-        // Hábitos da meta
+        items.forEach((item) => {
+          doc.text(`   - ${item}`, margin + 5, y)
+          y += 4
+        })
+
+        // Habitos
         if (goal.habits && goal.habits.length > 0) {
-          doc.setFontSize(8)
-          doc.setTextColor(163, 120, 250)
+          doc.setTextColor(124, 58, 237)
+          doc.text('   Habitos:', margin + 5, y)
+          y += 4
+          doc.setTextColor(107, 91, 123)
           goal.habits.forEach((habit: any) => {
-            doc.text(`   🔥 ${habit.action}${habit.time ? ` às ${habit.time}` : ''}${habit.place ? ` em ${habit.place}` : ''} (streak: ${habit.streak} dias)`, 25, y)
+            const habitStr = `${habit.action}${habit.time ? ` as ${habit.time}` : ''}${habit.place ? ` em ${habit.place}` : ''}`
+            doc.text(`     - ${habitStr} (${habit.streak} dias consecutivos)`, margin + 5, y)
             y += 4
           })
         }
 
         y += 3
-        if (y > 270) { doc.addPage(); y = 20 }
+        if (y > 260) { doc.addPage(); y = 20 }
       })
     }
 
-    // Rodapé
+    // ─── Rodape ────────────────────────────────────────────────────
     doc.setFontSize(8)
     doc.setTextColor(160, 143, 176)
-    doc.text('Gerado por Roda da Vida App', 105, 285, { align: 'center' })
-    doc.text(new Date().toLocaleString('pt-BR'), 105, 291, { align: 'center' })
+    const footer = `Gerado por Roda da Vida App em ${new Date().toLocaleString('pt-BR')}`
+    doc.text(footer, pageWidth / 2, 288, { align: 'center' })
 
     // Gerar buffer
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
