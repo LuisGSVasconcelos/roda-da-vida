@@ -46,6 +46,17 @@ async function initTurso(client: PrismaClient) {
     try { await client.$executeRawUnsafe(sql) }
     catch (e: any) { console.error('[prisma] Erro tabela:', e.message?.slice(0, 150)) }
   }
+
+  // Migração: adicionar colunas que podem não existir (schema antigo)
+  const migracoes = [
+    "ALTER TABLE \"Assessment\" ADD COLUMN \"status\" TEXT NOT NULL DEFAULT 'DRAFT'",
+    "ALTER TABLE \"Assessment\" ADD COLUMN \"completedAt\" DATETIME",
+  ]
+  for (const sql of migracoes) {
+    try { await client.$executeRawUnsafe(sql) }
+    catch {} // ignora se coluna já existe
+  }
+
   console.log('[prisma] ✅ Tabelas')
 
   // Seed

@@ -1,15 +1,25 @@
 import { auth, signOut } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { getDb } from '@/lib/prisma'
 
 export default async function DashboardPage() {
   const session = await auth()
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect('/auth/login')
   }
 
   const user = session.user
+
+  // Buscar rascunhos pendentes
+  const prisma = await getDb()
+  const drafts = await prisma.assessment.findMany({
+    where: { userId: session.user.id, status: 'DRAFT' },
+    include: { scores: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 5,
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f7f3ff] to-[#e9e0f5]">
@@ -88,6 +98,37 @@ export default async function DashboardPage() {
             </p>
           </Link>
         </div>
+
+        {/* Rascunhos pendentes */}
+        {drafts.length > 0 && (
+          <div className="mt-10">
+            <h3 className="text-lg font-bold text-[#2d1b3d] mb-4 flex items-center gap-2">
+              <span>📝</span> Rascunhos Pendentes ({drafts.length})
+            </h3>
+            <div className="grid gap-3">
+              {drafts.map((draft) => {
+                const filled = draft.scores.length
+                return (
+                  <Link
+                    key={draft.id}
+                    href={`/assessment/new?draft=${draft.id}`}
+                    className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-[#e0d8ea] border-dashed shadow-sm hover:shadow-md hover:border-[#7c3aed] transition-all flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-[#2d1b3d]">{draft.title}</p>
+                      <p className="text-xs text-[#6b5b7b] mt-1">
+                        {filled}/12 áreas preenchidas · {new Date(draft.updatedAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="text-sm text-[#7c3aed] font-semibold">
+                      Continuar →
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {user.role === 'PROFESSIONAL' && (
           <div className="mt-8">

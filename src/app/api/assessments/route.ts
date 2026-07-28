@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth'
 import { getDb } from '@/lib/prisma'
 
-// POST /api/assessments — criar avaliação com scores
+// POST /api/assessments — criar avaliação (rascunho ou completa)
 export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -11,12 +11,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { title, clientId, scores } = await req.json()
-
-    if (!scores || !Array.isArray(scores) || scores.length === 0) {
-      return Response.json({ error: 'Scores são obrigatórios' }, { status: 400 })
-    }
-
+    const { title, clientId, scores, status } = await req.json()
     const prisma = await getDb()
 
     const assessment = await prisma.assessment.create({
@@ -24,13 +19,15 @@ export async function POST(req: Request) {
         userId: session.user.id,
         clientId: clientId || null,
         title: title || 'Nova Avaliação',
-        scores: {
+        status: status === 'COMPLETED' ? 'COMPLETED' : 'DRAFT',
+        completedAt: status === 'COMPLETED' ? new Date() : null,
+        scores: scores?.length > 0 ? {
           create: scores.map((s: { categoryId: string; value: number; reflectionNotes?: string }) => ({
             categoryId: s.categoryId,
             value: Math.min(10, Math.max(0, s.value ?? 5)),
             reflectionNotes: s.reflectionNotes || null,
           })),
-        },
+        } : undefined,
       },
       include: {
         scores: {
@@ -48,16 +45,22 @@ export async function POST(req: Request) {
 }
 
 // GET /api/assessments — listar avaliações do usuário
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
   try {
+    const url = new URL(req.url)
+    const filter = url.searchParams.get('status') // 'DRAFT', 'COMPLETED', ou null (todos)
+
     const prisma = await getDb()
+    const where: any = { userId: session.user.id }
+    if (filter) where.status = filter
+
     const assessments = await prisma.assessment.findMany({
-      where: { userId: session.user.id },
+      where,
       include: {
         scores: {
           include: { category: true },
